@@ -18,7 +18,7 @@ To run this program, you need to:
 	"AlexFilterClass.h" and "FilterClass.h": Filter file for filtering noise;
 
 
-* /src: 		header files for this program. 
+* /src: 		source files for this program. 
 
 	"MatrixVector.cpp": user defined matrix based on Eigen library
 
