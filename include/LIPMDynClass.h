@@ -18,11 +18,11 @@ public:
 
 	double StopApexPositionControl(double zc, double dxf, double x_apex);
 	double StopApexTimeControl(double zc, double dxf, double tau);
-	double CrossApexVelocityControl(double zc, double dxf, double v_apex);	
+	double CrossApexVelocityControl(double zc, double dxf, double v_apex);
 	double CrossApexTimeControl(double zc, double dxf, double tau);
-	
+
 	double StateTransitionTime(double zc, double x0, double dx0, double xf, double dxf);
-	
+
 	double VelocityAtPositionCV(double zc, double x0, double dx0, double xf);
 	double VelocityAtPositionDV(double zc, double x0, double dx0, double xf);
 	double PositionAtVelocityCV(double zc, double x0, double dx0, double dxf);
@@ -34,8 +34,8 @@ public:
 	double RemainingTimePositionSymmetry(double zc, double x0, double dx0, double xf);
 	double RemainingTimeVelocitySymmetry(double zc, double x0, double dx0, double dxf);
 	vector<double> StateEvolution(double zc, double x0, double dx0, double time);
-	
-	double SagittalNominalVelocity(double zc, double step,double Tstep);
+
+	double SagittalNominalVelocity(double zc, double step, double Tstep);
 	double LateralNominalVelocity(double zc, double stepwidth, double StepTime);
 
 	double LateralNominalSway(double zc, double stepwidth, double StepTime);
@@ -47,6 +47,12 @@ public:
 
 	//Vector3d calcAngularVelocity(double dT, Vector3d ri0,Vector3d ri1);
 	//vector<double> foo();
+
+
+	double LateralNominalVelSSend(double zc, double stepwidth, double dym, double StepTime);
+	double deltaLateralEndVel(double vd0, double vdf, double deltaV0);
+	double deltaLateralPos(double zc, double deltaVel, double StepTime);
+	double SagittallPos(double zc, double dx0, double dxm, double StepTime);
 
 private:
 	const double g;
