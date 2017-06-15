@@ -1,3 +1,6 @@
+clear;
+clc;
+close all;
 load LateralGait.txt;
 
 time = LateralGait(:,1);
@@ -9,9 +12,10 @@ PredictTime = LateralGait(:,6);
 PredictFP = LateralGait(:,7);
 PredictVel= LateralGait(:,8);
 dis_ddy = LateralGait(:,9);
+fp_wrt_com = LateralGait(:,10);
 
-figure;
 %%
+figure;
 f1=figure(1);set(f1,'name','y COM & y COP VS t','numbertitle','off')
 
 
@@ -24,6 +28,14 @@ xlabel('Time [s]');
 ylabel('Position [m]');
 legend('y COM','y COP','Foot placement evolve according to time')
 
+
+%%
+figure;
+plot(time,dycom);
+%%
+% figure;
+% plot(time,fp_wrt_com);
+%{
 figure;
 % return;
 % f2=figure(2);set(f2,'name','PredictFP VS PredictTime + dyCOM vs t','numbertitle','off')
@@ -69,4 +81,4 @@ plot(time, dis_ddy);
 % set(f5,'name','dis_ddy VS t','numbertitle','off')
 title('dis_ddy VS t')
 
-
+%}
