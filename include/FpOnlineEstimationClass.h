@@ -1,4 +1,3 @@
-#pragma once
 //=================================
 // include guard
 #ifndef FP_ONLINEESTIMATION_CLASS_H
@@ -19,6 +18,7 @@ using namespace Eigen;
 class FpOnlineEstimation {
 private:
 	int number_of_dataset;
+	int cyclic_gait_start;
 	double zc;
 	double look_ahead_time;
 	double g;
@@ -36,10 +36,15 @@ public:
 	MatrixXd dataset_next_footplacement;
 	MatrixXd dataset_current_walking_state;
 	MatrixXd dataset_past_walking_state_stack;
-
+	MatrixXd weighting_matrix;
 	// double targeted_velocity;
-	double threshold_CoM_Pos;
-	double threshold_CoM_Vel;
+	// declaration for threshold
+	double threshold_CoM_pos;
+	double threshold_CoM_Vel_s;
+	double threshold_CoM_Vel_f;
+	double threshold_fp;
+	int impact;
+	int impact_forget;
 
 	MatrixXd walking_state_next_step;
 	//vector<double> walking_state_next_step;
@@ -47,18 +52,18 @@ public:
 	double footplacement_predict;
 
 	// include store CoM state into "dataset_past_walking_state_stack", and store them into "dataset_past_walking_state"
-	void collect_walking_state(const double &local_com_pos, const double &local_com_vel, const double &com_offset, int & StepIndex);
+	void collect_walking_state(const double &local_com_pos, const double &local_com_vel, const double &com_offset, const double &next_fp_wrt_CoM, int & StepIndex);
 	void collect_past_walking_state_stack(const double &local_com_pos, const double &local_com_vel, const double &com_offset, int & StepIndex);
 	void collect_next_footplacement(const double &next_fp_wrt_CoM, int & StepIndex);
-
 	void collect_current_walking_state(const double &local_com_vel, const double &targeted_vel);
 
-	MatrixXd calculate_control_coefficient(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
+	void set_weighting_matrix(const Ref<MatrixXd> &dataset_current, const double & mean);
 
+	MatrixXd calculate_control_coefficient(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
 	double estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &control_coefficient);
 
 	void define_initial_LIPM_setting(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
-	//vector<double> LIPM_StateEsimation(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
+	vector<double> LIPM_StateEsimation(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
 
 	void StateEsimation(const double &local_com_vel, const double & targeted_vel, const int & StepIndex);
 
@@ -68,5 +73,6 @@ public:
 // 0 for origin mode, LIMP + ZMP
 // 1 for online estimation mode
 extern const int control_mode;
-
+//extern  int impact;
+//extern  int impact_forget;
 #endif
