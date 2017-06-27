@@ -22,12 +22,14 @@ Eigen::Matrix<typename MatT::Scalar, MatT::ColsAtCompileTime, MatT::RowsAtCompil
 }
 
 
+//http://web.stanford.edu/group/SOL/software/lsqr/
+
 void FpOnlineEstimation::Init(const int & number_of_data_set) {
-	// 	To organize  '1 to n ' to 'dataset_past_walking_state'
+	// 	To organize  '1 to n ' to 'dataset_past_walking_vel'
 	// 	'2 to n+1 ' to 'dataset_next_footplacement'
 	//cout<<"test initialization"<<endl; 
 	number_of_dataset = number_of_data_set;
-	cyclic_gait_start = 2;
+	cyclic_gait_start = 4;
 	threshold_CoM_pos = 0.001;
 	threshold_CoM_Vel_s = 0.0005;
 	//threshold_CoM_Vel_f= 0.0045;
@@ -36,7 +38,7 @@ void FpOnlineEstimation::Init(const int & number_of_data_set) {
 	//impact;
 	dataset_past_walking_state_stack.resize(number_of_dataset + 1, 3);
 	//for CoM offset, CoM Vel, CoM Pos, 
-	dataset_past_walking_state.resize(number_of_dataset, 3);
+	dataset_past_walking_vel.resize(number_of_dataset, 3);
 	//for next foot placement with respect to CoM position
 	dataset_next_footplacement.resize(number_of_dataset, 1);
 	//for current CoM velocity, targeted velocity, CoM offset;
@@ -44,10 +46,10 @@ void FpOnlineEstimation::Init(const int & number_of_data_set) {
 	weighting_matrix = MatrixXd::Identity(number_of_dataset, number_of_dataset);
 	//weighting_matrix::setZero;
 	statef.resize(2);
-	//control_coefficient.resize(3, 1);
-	//control_coefficient
-	control_coefficient = MatrixXd::Zero(3, 1);
-	//control_coefficient::setZero;
+	//model_coeff.resize(3, 1);
+	//model_coeff
+	model_coeff = MatrixXd::Zero(3, 1);
+	//model_coeff::setZero;
 }
 
 void FpOnlineEstimation::define_initial_LIPM_setting(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time) {
@@ -58,19 +60,22 @@ void FpOnlineEstimation::define_initial_LIPM_setting(double &constant_height, co
 }
 
 void FpOnlineEstimation::collect_past_walking_state_stack(const double &local_com_pos, const double &local_com_vel, const double &com_offset, int & StepIndex) {
-	if (StepIndex>cyclic_gait_start) { // start to collct data when robot enter cyclic gait
-		if (StepIndex <= (number_of_dataset + cyclic_gait_start + 1)) {
-			int index_stack = StepIndex - (cyclic_gait_start + 1);
+	if (StepIndex>=cyclic_gait_start) { // start to collct data when robot enter cyclic gait
+		if (StepIndex < (number_of_dataset + cyclic_gait_start + 1)) {
+			int index_stack = StepIndex - cyclic_gait_start;
+			//store into Xs matrix
 			dataset_past_walking_state_stack(index_stack, 0) = local_com_pos;
 			dataset_past_walking_state_stack(index_stack, 1) = local_com_vel;
 			dataset_past_walking_state_stack(index_stack, 2) = com_offset;
 
-			if (index_stack>0) {
+
+			//store into X matrix
+			if (index_stack>=1) {
 				//for (int index_stack = 0; index_stack < (StepIndex-cyclic_gait_start-1); index_stack++) {
 				//collect 1 to n walking state as past walking state (CoM Vel, CoM next vel acutral,1)
-				dataset_past_walking_state(index_stack - 1, 0) = dataset_past_walking_state_stack(index_stack - 1, 1);
-				dataset_past_walking_state(index_stack - 1, 1) = dataset_past_walking_state_stack(index_stack, 1);
-				dataset_past_walking_state(index_stack - 1, 2) = dataset_past_walking_state_stack(index_stack - 1, 2);
+				dataset_past_walking_vel(index_stack - 1, 0) = dataset_past_walking_state_stack(index_stack - 1, 1);
+				dataset_past_walking_vel(index_stack - 1, 1) = dataset_past_walking_state_stack(index_stack, 1);
+				dataset_past_walking_vel(index_stack - 1, 2) = dataset_past_walking_state_stack(index_stack - 1, 2);
 				//}
 			}
 
@@ -92,9 +97,9 @@ void FpOnlineEstimation::collect_past_walking_state_stack(const double &local_co
 			//------------------data updating for walking state--------------------
 			for (int index_stack = 0; index_stack < number_of_dataset; index_stack++) {
 				//collect 1 to n walking state as past walking state (CoM Vel, CoM next vel acutral,1)
-				dataset_past_walking_state(index_stack, 0) = dataset_past_walking_state_stack(index_stack, 1);
-				dataset_past_walking_state(index_stack, 1) = dataset_past_walking_state_stack(index_stack + 1, 1);
-				dataset_past_walking_state(index_stack, 2) = dataset_past_walking_state_stack(index_stack, 2);
+				dataset_past_walking_vel(index_stack, 0) = dataset_past_walking_state_stack(index_stack, 1);
+				dataset_past_walking_vel(index_stack, 1) = dataset_past_walking_state_stack(index_stack + 1, 1);
+				dataset_past_walking_vel(index_stack, 2) = dataset_past_walking_state_stack(index_stack, 2);
 			}
 			//---------------------------------------------------	
 		}
@@ -102,13 +107,17 @@ void FpOnlineEstimation::collect_past_walking_state_stack(const double &local_co
 }
 
 void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, const double &local_com_vel, const double &com_offset, const double &next_fp_wrt_CoM, int & StepIndex) {
-	if (StepIndex>cyclic_gait_start) {// start to collct data when robot enter cyclic gait
+	if (StepIndex>=cyclic_gait_start) {// start to collct data when robot enter cyclic gait
+	//cout << "----step index: " << StepIndex << "\t local xcom: " << local_com_pos << "\t dxcom: " << local_com_vel << "\t ft wrt CoM: " << next_fp_wrt_CoM << endl;
 
-		if (StepIndex <= number_of_dataset + cyclic_gait_start + 1) {
+		if (StepIndex < number_of_dataset + cyclic_gait_start + 1) {
 			// data collection during initial stage
 
-			collect_past_walking_state_stack(local_com_pos, local_com_vel, com_offset, StepIndex);
+			//collect Xs (CoM pos, CoM vel, 1) data from "c" to "c+n+1" 
+			collect_past_walking_state_stack(local_com_pos, local_com_vel, com_offset, StepIndex);		
+			//collect foot placement data from "c+1" to "c+n+1"
 			collect_next_footplacement(next_fp_wrt_CoM, StepIndex);
+	
 
 		}
 		else {
@@ -119,7 +128,8 @@ void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, cons
 			
 			for (int index_th = 0; index_th < number_of_dataset; index_th++) { 
 				//threshold for CoM velocity at the beginning of touch down
-				if (abs(local_com_vel - dataset_past_walking_state(index_th, 0)) >= threshold_CoM_Vel_s) {
+				/*
+				if (abs(local_com_vel - dataset_past_walking_vel(index_th, 0)) >= threshold_CoM_Vel_s) {
 					//cout << "------out of velocity threshold, store in data --------" << endl;
 					bool_CoM_vel_s *= 1;
 				}
@@ -128,6 +138,7 @@ void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, cons
 					bool_CoM_vel_s *= 0;
 				}
 				//threshold for foot placment change
+				
 				if (abs(next_fp_wrt_CoM - dataset_next_footplacement(index_th, 0)) >= threshold_fp) {
 					//cout << "------out of fp threshold, store in data--------" << endl;
 					bool_fp *= 1;
@@ -146,7 +157,7 @@ void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, cons
 					//cout<<"------within velocity threshold, ignore data --------"<<endl;
 				bool_CoM_vel_e *=0;
 				}
-				
+				*/
 			}
 			
 			if (((bool_CoM_vel_s*bool_fp) == 1) || (impact == 1)) {
@@ -162,7 +173,7 @@ void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, cons
 					impact = 0;
 
 				}
-				cout << "add data" << endl;
+				//cout << "add data" << endl;
 			}
 			else {
 				impact_forget = 0;
@@ -173,18 +184,18 @@ void FpOnlineEstimation::collect_walking_state(const double &local_com_pos, cons
 			cout<<"bool_fp: "<<bool_fp<<" fp: "<<next_fp_wrt_CoM<<endl;
 			cout<<"threshold cond: "<<(bool_CoM_vel_s*bool_fp)<<endl<<endl;
 			*/
-			set_weighting_matrix(dataset_past_walking_state, 10);
+			set_weighting_matrix(dataset_past_walking_vel);
 		}
 	}
 	//cout<<"dataset_past_walking_state_stack"<<endl<<dataset_past_walking_state_stack<<endl;
 	//cout<< "weighting_matrix"<<endl<<weighting_matrix<<endl;	
-	//cout << "dataset_past_walking_state" << endl << dataset_past_walking_state << endl;
+	//cout << "dataset_past_walking_vel" << endl << dataset_past_walking_vel << endl;
 	//cout << "dataset_next_footplacement" << endl << dataset_next_footplacement << endl << endl;
 }
 
 void FpOnlineEstimation::collect_next_footplacement(const double &next_fp_wrt_CoM, int & StepIndex) {
-	if (StepIndex>cyclic_gait_start) { // start to collct data when robot enter cyclic gait
-		if ((StepIndex <= number_of_dataset + cyclic_gait_start)) {
+	if (StepIndex>=cyclic_gait_start+1) { // start to collct data when robot enter cyclic gait
+		if ((StepIndex < number_of_dataset + cyclic_gait_start+1)) {
 			dataset_next_footplacement(StepIndex - (cyclic_gait_start + 1), 0) = next_fp_wrt_CoM;
 		}
 		else {
@@ -201,30 +212,58 @@ void FpOnlineEstimation::collect_next_footplacement(const double &next_fp_wrt_Co
 	}
 
 }
-
-void FpOnlineEstimation::set_weighting_matrix(const Ref<MatrixXd> &dataset_current, const double & mean) {
-	// identity matrix
-
+void FpOnlineEstimation::set_weighting_matrix(const Ref<MatrixXd> &dataset_current) {
+	//--------------------------identity matrix---------------------------
+	/*
 	for (int i = 0; i < number_of_dataset ; i++) {
 
 	weighting_matrix(i,i)=1;
 
 	}
+	*/
+	double average = dataset_current.col(0).mean();
 
-	//Standard Deviation Dependent
+	//--------------------------error variance---------------------------
+//weight proportional to error variance, based on CoM vel at the beginning of touch-down
 	/*
 	for (int i = 0; i < number_of_dataset ; i++) {
-
-	weighting_matrix(i,i)=(dataset_current-mean)^2;
-
+	weighting_matrix(i,i)=pow((dataset_current(i,0)-average),2);
+	}
+	//normalized
+	double sum = weighting_matrix.sum();
+	for (int i = 0; i < number_of_dataset ; i++) {
+	weighting_matrix(i,i)=weighting_matrix(i,i)/sum;
 	}
 	*/
-	//time Dependent
+//weight inversely proportional to error variance
+	
+	for (int i = 0; i < number_of_dataset ; i++) {
+	weighting_matrix(i,i)=1/pow((dataset_current(i,0)-average),2);
+	}
+	//cout<<"weighting_matrix: "<<endl<<weighting_matrix<<endl;
+	double sum = weighting_matrix.sum();
+	//normalized
+	for (int i = 0; i < number_of_dataset ; i++) {
+	weighting_matrix(i,i)=weighting_matrix(i,i)/sum;
+	}
 	/*
+	//-------------------time dependent-------------------------
+
 	for (int i = 1; i <= number_of_dataset; i++) {
 		double sum = (1 + number_of_dataset)*number_of_dataset / 2;
 		weighting_matrix(i - 1, i - 1) = i / sum;
 	}
+	*/
+	//time dependent-- exp(kt),t is consequece of step,0-older, 6 is last	
+	/*
+	for (int i = 0; i < number_of_dataset; i++) {
+	weighting_matrix(i,i)=exp(i);
+	}
+	double sum = weighting_matrix.sum();
+	for (int i = 0; i < number_of_dataset; i++) {
+	weighting_matrix(i,i)=weighting_matrix(i,i)/sum;
+	}
+	
 	cout << "weighting_matrix: " << endl << weighting_matrix << endl;
 	*/
 }
@@ -235,59 +274,86 @@ void FpOnlineEstimation::collect_current_walking_state(const double &local_com_v
 																								 //http://www.cplusplus.com/reference/cmath/copysign/
 }
 
-double FpOnlineEstimation::estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &control_coefficient) {
+double FpOnlineEstimation::estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &model_coeff) {
+	cout<<"current_walking_state"<<endl<<current_walking_state<<endl<<endl;
 
-	walking_state_next_step = current_walking_state * control_coefficient;
+	walking_state_next_step = current_walking_state * model_coeff;
 	footplacement_predict = walking_state_next_step(0, 0);
-	//cout<<"current_walking_state"<<endl<<current_walking_state<<endl<<endl;
-	//<<"control_coefficient"<<endl<<control_coefficient<<endl<<endl;
-	//cout <<"Online_estimation_fp: "<<footplacement_predict<<"; ";
-	//statef[0]=0;
+	cout <<"Online_estimation_fp: "<<footplacement_predict<<"; ";
 	return footplacement_predict;
 }
 
-MatrixXd FpOnlineEstimation::calculate_control_coefficient(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step) {
-	control_coefficient = pinv(weighting_matrix*dataset_current)*weighting_matrix*dataset_next_step;
+MatrixXd FpOnlineEstimation::calculate_model_coeff(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step) {
+	model_coeff = pinv(weighting_matrix*dataset_current)*weighting_matrix*dataset_next_step;
 
-	cout<<"control_coefficient"<<endl<<control_coefficient<<endl;
+	//cout<<"model_coeff"<<endl<<model_coeff<<endl;
 
-	return control_coefficient;
+	return model_coeff;
 }
-
-
 
 
 void FpOnlineEstimation::StateEsimation(const double &local_com_vel, const double & targeted_vel, const int & StepIndex) {
 	//targeted_velocity = targeted_vel;
-	if (StepIndex <= (number_of_dataset + cyclic_gait_start + 1)) {
+	double zc = 0.5;
+	double g = 9.81;
+	double Tc = sqrt(zc / g);
+	double StepTime1 = 0.5;
+	double tao = StepTime1 / Tc;
+	if (StepIndex < (number_of_dataset + cyclic_gait_start + 1)) {
 		static const auto runOnce = [] { cout << "-------------This is fp control: Initial LIPM to collect data----------------" << endl; return true; }();
 		//LIPM_StateEsimation(zc,com_pos_current,com_vel_current,look_ahead_time);
-		double zc = 0.5;
-		double g = 9.81;
-		double Tc = sqrt(zc / g);
-		double StepTime1 = 0.5;
-		double tao = StepTime1/Tc;
-		control_coefficient(0, 0) = Tc*cosh(tao)/sinh(tao);
-		control_coefficient(1, 0) = -Tc/ sinh(tao);
-		control_coefficient(2, 0) = 0;
-		//collect_current_walking_state(local_com_vel, targeted_vel);
-		//estimate_walking_state_next_step(dataset_current_walking_state, control_coefficient);
+		model_coeff(0, 0) = Tc*cosh(tao)/sinh(tao);
+		model_coeff(1, 0) = -Tc/ sinh(tao);
+		model_coeff(2, 0) = 0;
+		collect_current_walking_state(local_com_vel, targeted_vel);
+		estimate_walking_state_next_step(dataset_current_walking_state, model_coeff);
 	}
 	/*
 	else if(StepIndex <= (number_of_dataset+5)){
 	static const auto runOnce = [] { cout << "-------------Start online estimation----------------"<< endl; return true;}();
 	//LIPM_StateEsimation(zc,com_pos_current,com_vel_current,look_ahead_time);
 	collect_current_walking_state(local_com_vel,targeted_vel);
-	calculate_control_coefficient(dataset_past_walking_state,dataset_next_footplacement);
-	//estimate_walking_state_next_step(dataset_current_walking_state,control_coefficient);
+	calculate_model_coeff(dataset_past_walking_vel,dataset_next_footplacement);
+	//estimate_walking_state_next_step(dataset_current_walking_state,model_coeff);
 	}
 	*/
 	else {
 		static const auto runOnce = [] { cout << "-------------Start online estimation----------------" << endl; return true; }();
 		collect_current_walking_state(local_com_vel, targeted_vel);
-		calculate_control_coefficient(dataset_past_walking_state, dataset_next_footplacement);
-		//estimate_walking_state_next_step(dataset_current_walking_state, control_coefficient);
+		calculate_model_coeff(dataset_past_walking_vel, dataset_next_footplacement);
+		/*
+		model_coeff(0, 0) = Tc*cosh(tao) / sinh(tao);
+		model_coeff(1, 0) = -Tc / sinh(tao);
+		model_coeff(2, 0) = 0;
+		*/
+		estimate_walking_state_next_step(dataset_current_walking_state, model_coeff);
+		
+	}
+}
 
-		}
-
+double  FpOnlineEstimation::vel_target(double time, double totaltime, double StepTime) {
+	double dx;
+	double step2target_vel = 2;
+	double t1 = 2 * StepTime;
+	double t2 = 2 * StepTime + totaltime / 3;
+	double t3 = 2 * StepTime + totaltime * 2 / 3;
+	if (time < t1) {// transist time to reach 0.1 m/s
+		dx = 0.1 / t1*time;
+	}
+	else if (time< totaltime / 3) {
+		dx = 0.1;
+	}
+	else if (time< t2) {
+		dx = 0.2 / (2 * StepTime)*(time- totaltime / 3) + 0.1;
+	}
+	else if (time< totaltime * 2 / 3) {
+		dx = 0.3;
+	}
+	else if (time < t3) {
+		dx = dx = 0.2 / (2 * StepTime)*(time - totaltime*2 / 3) + 0.3;
+	}
+	else {
+		dx = 0.5;
+	}
+	return dx;
 }

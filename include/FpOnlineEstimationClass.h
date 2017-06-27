@@ -31,10 +31,11 @@ public:
 	void Init(const int & number_of_data_set);
 
 	// declaration statement for data set 
-	MatrixXd control_coefficient;
-	MatrixXd dataset_past_walking_state;
+	MatrixXd model_coeff;
+	MatrixXd dataset_past_walking_vel;
 	MatrixXd dataset_next_footplacement;
 	MatrixXd dataset_current_walking_state;
+
 	MatrixXd dataset_past_walking_state_stack;
 	MatrixXd weighting_matrix;
 	// double targeted_velocity;
@@ -57,14 +58,14 @@ public:
 	void collect_next_footplacement(const double &next_fp_wrt_CoM, int & StepIndex);
 	void collect_current_walking_state(const double &local_com_vel, const double &targeted_vel);
 
-	void set_weighting_matrix(const Ref<MatrixXd> &dataset_current, const double & mean);
+	void set_weighting_matrix(const Ref<MatrixXd> &dataset_current);
 
-	MatrixXd calculate_control_coefficient(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
-	double estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &control_coefficient);
+	MatrixXd calculate_model_coeff(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
+	double estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &model_coeff);
 
 	void define_initial_LIPM_setting(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
-	vector<double> LIPM_StateEsimation(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
-
+	//vector<double> LIPM_StateEsimation(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);
+	double vel_target(double time, double totaltime, double StepTime);
 	void StateEsimation(const double &local_com_vel, const double & targeted_vel, const int & StepIndex);
 
 };

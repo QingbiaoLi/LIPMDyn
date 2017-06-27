@@ -1,0 +1,92 @@
+	{
+		StepIndex += 1;		
+		// origin
+
+		xcapture1 = LIPM.SagittallPos(zc, dxcom, 0.5, StepTime2);
+		OL_sagittal.collect_walking_state(xcom - xcop1, dxcom, 0, xcapture1, StepIndex);
+		OL_sagittal.StateEsimation(dxcom, 0.5, StepIndex);
+		//xcapture1 = OL_sagittal.footplacement_predict;
+		xcop1 = xcom + xcapture1;
+		// add noise and filter	
+		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
+		//xcapture1 = LIPM.SagittallPos(zc, dxcom_e_f, 0.5, StepTime2);	
+		//xcop1 = xcom_e_f + xcapture1;
+
+		//-------------------online estimation--------------------
+		//cout << "---xcop_peredicted_next_step_e_f: " << xcop_peredicted_next_step_e_f << endl;
+		//OL_sagittal.collect_walking_state(xcom_e_f - xcop1, dxcom_e_f, 1, xcapture2_e_f_predict, StepIndex);
+		cout << "---StepIndex ---" << StepIndex << endl << "xcom: " << xcom_e_f << "\t " << xcom - xcop1 << endl;
+		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
+		if (StepIndex >= (data_set_number + 2 + 1)) {
+			//xcop_peredicted_next_step_e_f = xcom_e_f +OL_sagittal.footplacement_predict;
+			//xcop_peredicted_next_step_e_f = xcom + OL_sagittal.footplacement_predict;
+			cout <<"dataset_past_walking_state_stack"<< OL_sagittal.dataset_past_walking_state_stack << "dataset_past_walking_state" << endl << OL_sagittal.dataset_past_walking_state << endl << OL_sagittal.dataset_next_footplacement << endl << "control coeff:" << OL_sagittal.control_coefficient << endl << "current walking state" << OL_sagittal.dataset_current_walking_state << endl << "footplacement estimation: " << OL_sagittal.footplacement_predict << endl << endl;
+			//xcop1 = xcop_peredicted_next_step_e_f; // xcop2;//
+			//cout << "fp_wrt_com: " << OL_sagittal.dataset_next_footplacement << endl;
+		}
+		//cout << "xcop_peredicted_next_step_e_f: " << xcop_peredicted_next_step_e_f << endl;
+		//-------------------Assign the global foot placement--------------
+		//xcop1 = xcop2;
+
+		StepEndTime += StepTime2;
+		StepTime1 = StepTime2; // assign the next step time to current step time
+
+							   //-------------------check data-------------------
+		cout << "x accel: " << ddxcom*zc / (xcom - xcop1) << endl;
+		cout << "Stepindex" << StepIndex << "  in dataset" << endl;
+		//cout << "----xcom: " << xcom << "\t dxcom: " << dxcom << endl;
+		//cout << "----xcom_e_f: " << xcom_e_f << "\t dxcom_e_f: " << dxcom_e_f << endl << endl;
+	}
+
+	//  below  apply FP control at lower rate
+	
+	/*
+	double time = StepEndTime - realtime;
+	double vel_tar = 0.5;// OL_sagittal.vel_target(realtime, SimTime, StepTime1);
+	
+	xstate = LIPM.StateEvolution(zc, xcom - xcop1, dxcom, time);  // xstate is with respect to the support foot // why time is change but xstate does not changes a lot
+
+	xcapture1 = LIPM.SagittallPos(zc, xstate[1], vel_tar, StepTime2);// ideally, vel in and out are same in sagittal, 0.5 is target velocity
+
+	
+	xcop2 = xcop1 + xstate[0] + xcapture1;  // xcop2 is the global position
+	//xcop_peredicted_next_step_e_f = xcop1 + xstate[0] + xcapture1;
+	//cout << xcop2 << endl;
+	
+	
+	xstate_e_f = LIPM.StateEvolution(zc, xcom_e_f - xcop1, dxcom_e_f, time);  // ystate is with respect to the support foot																										 //ystate_noise_filter = LIPM.StateEvolution(zc, ycom_noise_filter-ycop1, dycom, time); 
+	xcapture2_e_f_predict = LIPM.SagittallPos(zc, xstate_e_f[1], 0.5, StepTime2);
+	xcapture2_e_f_observe= xcop2- xcom_e_f;
+	//xcapture2_noise_filter_observe = xcop2-xcom_noise;
+	//xcapture2_noise_filter_observe = xstate[0]+xcapture2-xstate_noise_filter[0];
+	xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture2_e_f_observe;
+	//xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture2_e_f_predict;
+	*/
+
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------
+	/*
+		double time = StepEndTime - realtime;
+		double vel_tar = 0.5;// OL_sagittal.vel_target(realtime, SimTime, StepTime1);
+
+		xstate = LIPM.StateEvolution(zc, xcom - xcop1, dxcom, time);  // xstate is with respect to the support foot // why time is change but xstate does not changes a lot
+		xcapture1 = LIPM.SagittallPos(zc, xstate[1], vel_tar, StepTime2);// ideally, vel in and out are same in sagittal, 0.5 is target velocity
+
+		xcop2 = xcop1 + xstate[0] + xcapture1;  // xcop2 is the global position
+		//xcop_peredicted_next_step_e_f = xcop1 + xstate[0] + xcapture1;
+		//cout << xcop2 << endl;
+
+		xstate_e_f = LIPM.StateEvolution(zc, xcom_e_f - xcop1, dxcom_e_f, time);  // ystate is with respect to the support foot																										 //ystate_noise_filter = LIPM.StateEvolution(zc, ycom_noise_filter-ycop1, dycom, time);
+		//xcapture1_e_f_predict = LIPM.SagittallPos(zc, xstate_e_f[1], 0.5, StepTime2);
+		xcapture1_e_f_observe= xcop2- xcom_e_f;
+		xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture1_e_f_observe;
+		*/

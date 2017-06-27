@@ -9,11 +9,11 @@ dxcom = LateralGait(:,3);
 ddxcom = LateralGait(:,4);
 xcop = LateralGait(:,5);
 
-PredictTime = LateralGait(:,6);
-PredictFP = LateralGait(:,7);
-PredictVel= LateralGait(:,8);
-dis_ddy = LateralGait(:,9);
-% fp_wrt_com = LateralGait(:,10);
+xcom_e_f = LateralGait(:,6);
+dxcom_e_f = LateralGait(:,7);
+xcop_e_f= LateralGait(:,8);
+xcapture2_e_f_predict = LateralGait(:,9);
+xcapture2_e_f_observe = LateralGait(:,10);
 
 fp_wrt_com = LateralGait(:,11);
 com_wrt_stance_foot = LateralGait(:,12);
@@ -23,6 +23,7 @@ coeff_vd = LateralGait(:,14);
 coeff_com_offset= LateralGait(:,15);
 
 %%
+%{
 result(1) = figure('name','online gain adpation for bipedal walking','units','normalized','outerposition',[0 0 1 1]);
 
 % subplot(2,1,1)
@@ -43,14 +44,16 @@ legend({'Desired Velocity coeff','Current Velocity coeff','CoM offset'},'FontSiz
 % saveas(result(1),saveimages_name);  
 %  print(result(1),saveimages_name,'-dpng','-r300');
 % print(result(1),saveimages_name,'-dpdf','-r0');
+%}
 %% plot result -  CoM vel and desired vel(Sagittal)
 result(2)=figure('name','Validation of online estimation method (Sagittal vel)','units','normalized','outerposition',[0 0 1 1]);
 
 plot(time,dxcom,'k','LineWidth',3);
 hold on; grid on;
+plot(time,dxcom_e_f,'r','LineWidth',3);
 title('Sagittal data in support foot frame','FontSize',25);
 target_vel= ones(size(dxcom,1),1)*0.5;
-plot(time,target_vel,'r','LineWidth',3);
+plot(time,target_vel,'g','LineWidth',3);
 % Reference of Global COM pos
 % plot(time, com_ref_x,'g--');
 
@@ -64,12 +67,32 @@ set(gca,'fontsize',30,'FontWeight','bold');
 % print(result(2),saveimages_name,'-dpng','-r300');
 
 %%
-% figure;
-% plot(time,fp_wrt_com);
-% figure;
-% plot(time,com_wrt_stance_foot);
+%{
+figure;
+plot(time,fp_wrt_com);
+%%
+figure;
+plot(time,com_wrt_stance_foot);
+result(3)=figure('name','Validation of online estimation method (Sagittal vel)','units','normalized','outerposition',[0 0 1 1]);
 
+plot(time,xcom,'k','LineWidth',3);
+hold on; grid on;
+plot(time,xcom_e_f,'r','LineWidth',3);
+title('Sagittal data in support foot frame','FontSize',25);
+target_vel= ones(size(dxcom,1),1)*0.5;
+% plot(time,target_vel,'g','LineWidth',3);
+% Reference of Global COM pos
+% plot(time, com_ref_x,'g--');
 
+xlabel('Time (s)','FontSize',25);
+ylabel('CoM Velocity (sagittal) (m/s)','FontSize',30);
+legend({'Global CoM vel',' Target Vel'},'FontSize',30,'Location','southeast')
+set(gca,'fontsize',30,'FontWeight','bold');
+% saveas(result(3),'result/images/Validation of online estimation method (Local Sagittal).png');  
+% saveimages_name =sprintf('%s/Validation of online estimation method (Vel Sagittal)',saveimages_dir);
+% saveas(result(3),saveimages_name); 
+% print(result(2),saveimages_name,'-dpng','-r300');
+%}
 %{
 figure;
 % return;
