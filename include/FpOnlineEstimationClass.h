@@ -33,6 +33,7 @@ public:
 	// declaration statement for data set 
 	MatrixXd model_coeff;
 	MatrixXd dataset_past_walking_vel;
+MatrixXd dataset_past_walking_state;// for projection from dx0 to dxf
 	MatrixXd dataset_next_footplacement;
 	MatrixXd dataset_current_walking_state;
 
@@ -60,7 +61,8 @@ public:
 
 	void set_weighting_matrix(const Ref<MatrixXd> &dataset_current);
 
-	MatrixXd calculate_model_coeff(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
+MatrixXd calculate_model_coeff_dxf(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
+	MatrixXd calculate_model_coeff_fp(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step);
 	double estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &model_coeff);
 
 	void define_initial_LIPM_setting(double &constant_height, const double &local_com_pos, const double &local_com_vel, double &Predict_Time);

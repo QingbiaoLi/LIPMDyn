@@ -90,3 +90,65 @@
 		xcapture1_e_f_observe= xcop2- xcom_e_f;
 		xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture1_e_f_observe;
 		*/
+
+
+
+
+-------------------------------------------------------------------
+
+	if (realtime>StartTime && store_time.back() < StartTime) {// calculate xcapture2 after start period, only once	
+		xcapture2 = 0;
+		//insipred by equation 4.54, to predict the next lateral foot placement
+		//xcop1 = xcom + xcapture2;
+		xcop1 = xcom + xcapture2;
+		//ysway = xcom - xcop1;
+		StepIndex += 1;
+		cout <<"Stepindex"<<StepIndex<< " not in dataset"<< endl;
+	}
+	if (realtime > StepEndTime) {// at the beginning of new step
+		StepIndex += 1;
+		
+		//-------------------Ideal case---------------
+		//LIPM model based foot placement prediction
+		double vel_tar = 0.5;//OL_sagittal.vel_target(realtime, SimTime, StepTime1);
+		xcapture1 = LIPM.SagittallPos(zc, dxcom, vel_tar, StepTime2);
+		
+		
+		//Online Estimation
+		OL_sagittal.collect_walking_state(xcom - xcop1, dxcom, 1, xcapture1, StepIndex);
+
+		
+		//-------------------with gaussian noise case---------------
+		/*
+		double vel_tar = OL_sagittal.vel_target(realtime, SimTime, StepTime1);
+		xcapture1 = LIPM.SagittallPos(zc, dxcom_e_f, vel_tar, StepTime2);
+		xcop2 = xcop1+ xcom_e_f+ xcop2 - xcom_e_f;//xcop_peredicted_next_step_e_f;//xcom_e_f + xcapture1;
+		*/
+
+		//-------------------Assign the global foot placement--------------
+		xcop2 = xcom + xcapture1;//OL_sagittal.footplacement_predict;
+		cout << "xcop1_before:" << xcop1 << " xcom: " << xcom <<" xcapture1: "<<xcapture1<< endl;
+
+		//-------------------check data-------------------
+		if (StepIndex >= (data_set_number + 2 + 2)) {
+			//xstate = LIPM.StateEvolution(zc, xcom - xcop1, dxcom, StepTime2);
+			OL_sagittal.StateEsimation(dxcom, vel_tar, StepIndex);
+			//OL_sagittal.collect_current_walking_state(dxcom, vel_tar);
+			//OL_sagittal.calculate_model_coeff_fp(OL_sagittal.dataset_past_walking_vel, OL_sagittal.dataset_next_footplacement);
+			//OL_sagittal.estimate_walking_state_next_step(OL_sagittal.dataset_current_walking_state, OL_sagittal.model_coeff);
+			//xcop2 = xcop1+xstate[0]+ OL_sagittal.footplacement_predict;
+			//xcop2 = xcom+ OL_sagittal.footplacement_predict;
+			cout << "dataset_past_walking_state_stack: " << endl << OL_sagittal.dataset_past_walking_state_stack << endl << "dataset_past_walking_state: " << endl << OL_sagittal.dataset_past_walking_vel << endl;
+			cout << OL_sagittal.dataset_next_footplacement << endl << "control coeff:" << OL_sagittal.model_coeff << endl << "current walking state: " << OL_sagittal.dataset_current_walking_state << endl;
+			
+			//cout << "footplacement estimation: " << OL_sagittal.footplacement_predict << endl << endl;
+		}
+		cout << "xcop1 after: " << xcop2 << endl;
+
+		//xcop1 = xcom + OL_sagittal.footplacement_predict;
+		
+		xcop1 = xcop2;
+		//-------------------update the time-------------------
+		StepEndTime += StepTime2;
+		StepTime1 = StepTime2;
+	}	// here the condition is time based coz the time constraint comes from sagittal plane

@@ -11,90 +11,8 @@
 #include "LIPMDynClass.h"
 #include "FpOnlineEstimationClass.h"
 #include "FilterClass.h"
+#include "RobotParameter.h"
 
-
-#define DEGTORAD(x)  x*M_PI/180.0
-#define RADTODEG(x)  x*180.0/M_PI
-void logdata();
-void savedata();
-void RTControl(double SamplingTime);
-double Start1(); // output cop
-double CyclicGaitLateral(); // output cop
-double Stop(double zc, double kp, double kd, double xs, double dxs, double p_plus, double p_minus); // output cop
-double Sign(double x);
-
-LIPMDynClass LIPM;
-FpOnlineEstimation OL_sagittal;
-
-vector<double> xstate(2, 0);
-vector<double> xstate_e_f(2, 0);
-double StepTime1 = 0.5;
-double StepTime2 = 0.5;
-double StartTime;
-double SimTime = 10.0;
-double StopTime = SimTime - 0.0;
-
-double dT = 0.0002;
-double zc = 0.5;
-double g = 9.81;
-double realtime = 0.0;
-double xcom, dxcom, ddxcom;
-double xcop1, xcop2, xcapture1, xcapture2, ysway;//xcop1,xcop2 is the foot placement is 
-double StepEndTime;
-double PredictTime; // predicted landing time
-
-double yf = 0.0;
-double p_plus = 0.10;// 0.10;0.0;// probably the lateral step size  
-double p_minus = -0.10; //-0.10;
-double tswitch;
-
-vector<double> store_time(1, 0);
-vector<double> store_xcom(1, 0);
-vector<double> store_dxcom(1, 0);
-vector<double> store_ddxcom(1, 0);
-vector<double> store_xcop(1, 0);
-vector<double> store_xcom_e_f(1, 0);
-vector<double> store_dxcom_e_f(1, 0);
-vector<double> store_xcop_e_f(1, 0);
-vector<double> store_xcapture1_e_f_predict(1, 0);
-vector<double> store_xcapture1_e_f_observe(1, 0);
-
-double dis_time = 0;
-double dis_duration = 0.1;
-double dis_A;
-bool dis_enable = 0;
-
-//additional code for saggittal, online estimation
-
-int StepIndex;
-double samplingTime = 0.004;
-int data_set_number = 6;
-double com_offset = 0.0;
-double fp_wrt_com;
-
-//add noise
-double gaussian_e;
-//static double mag;
-//static double xcom_e_old, xcom_e, dxcom_e;
-double xcom_e_old, xcom_e, dxcom_e, xcom_e_f_old;
-double xcop_peredicted_next_step_e_f;
-double ddxcom_e;
-double xcapture2_e_predict;
-double xcapture2_e_observe;
-double xcom_e_old_filter, xcom_e_f, dxcom_e_f;
-double xcop_e_pure_f;
-double xcop_e_f;
-double ddxcom_e_f;
-double xcapture1_e_f_predict;
-double xcapture1_e_f_observe;
-
-FilterClass FilterClass_xcom, FilterClass_dxcom, FilterClass_xcop, FilterClass_xcapture2, FilterClass_xstate;
-
-vector<double> store_fp_wrt_com(1, 0);
-vector<double> store_com_wrt_stance_foot(1, 0);
-vector<double> store_coeff_v0(1, 0);
-vector<double> store_coeff_vd(1, 0);
-vector<double> store_coeff_com_offset(1, 0);
 
 int main() {
 	StartTime = 0.8; // Duration of inital step strategy. (time of initiation of lateral gait)
@@ -115,10 +33,6 @@ int main() {
 	FilterClass_xcom.butterworth(samplingTime, 10.0, 1);
 	FilterClass_dxcom.butterworth(samplingTime, 10.0, 1);
 
-	//FilterClass_xcop.butterworth(samplingTime, 10.0, 1);
-	//FilterClass_xcapture2.butterworth(samplingTime, 5.0, 1);
-	//FilterClass_xstate.butterworth(samplingTime, 10.0, 1);
-
 	tswitch = LIPM.LateralSwitchTime(zc, xcom, dxcom, yf, p_plus, p_minus, StartTime); // return time of switching phase
 	StepEndTime = StartTime + StepTime1; // End time of 1st periodic step.
 
@@ -133,6 +47,8 @@ int main() {
 		xcom += dxcom*dT + 0.5*ddxcom*dT*dT;
 		dxcom += ddxcom*dT;
 		realtime += dT;
+
+
 	}
 
 	savedata();
@@ -142,8 +58,9 @@ int main() {
 }
 
 void RTControl(double SamplingTime) {
-	if ((int)floor(realtime / dT) % (int(SamplingTime / dT)) == 0) { // now update very 20 ms. measure the data out of certain dT
-																	 //---------------------------Add gaussian noise in ycom.-------------------
+	if ((int)floor(realtime / dT) % (int(SamplingTime / dT)) == 0) { 
+		// now update very 20 ms. measure the data out of certain dT
+		//---------------------------Add gaussian noise in ycom.-------------------
 		std::random_device rd;
 		std::mt19937 generator(rd());
 
@@ -158,12 +75,6 @@ void RTControl(double SamplingTime) {
 		xcom_e_old = xcom_e;
 		xcom_e = xcom + gaussian_e + com_offset;// it is a realistic measurement of CoM with gaussian noise and offset.
 		dxcom_e = (xcom_e - xcom_e_old) / SamplingTime;
-
-		//ddxcom_e = (xcom_e-xcop_peredicted_next_step_e)/zc*g;
-		//xcom_e_old_filter = xcom_e_f;
-		//dxcom_e_f=(xcom_e_f-ycom_e_old_filter)/SamplingTime;
-		//dxcom_e_f=FilterClass_dxcom.applyFilter(dxcom_e);
-		//dxcom_e_f=FilterClass_dxcom.applyFilter(dxcom);
 
 		xcom_e_f = FilterClass_xcom.applyFilter(xcom_e);
 		dxcom_e_f = FilterClass_dxcom.applyFilter(dxcom_e);
@@ -191,53 +102,72 @@ double CyclicGaitLateral() {
 	if (realtime>StartTime && store_time.back() < StartTime) {// calculate xcapture2 after start period, only once	
 		xcapture2 = 0;
 		//insipred by equation 4.54, to predict the next lateral foot placement
-		//xcop1 = xcom + xcapture2;
 		xcop1 = xcom + xcapture2;
-		//ysway = xcom - xcop1;
 		StepIndex += 1;
 		cout <<"Stepindex"<<StepIndex<< " not in dataset"<< endl;
 	}
-	if (realtime > StepEndTime) {// at the beginning of new step
+	if (realtime > StepEndTime) {
 		StepIndex += 1;
-		
-		//-------------------Ideal case---------------
-		//LIPM model based foot placement prediction
-		double vel_tar = 0.5;//OL_sagittal.vel_target(realtime, SimTime, StepTime1);
-		xcapture1 = LIPM.SagittallPos(zc, dxcom, vel_tar, StepTime2);
-		
-		
-		//Online Estimation
-		OL_sagittal.collect_walking_state(xcom - xcop1, dxcom, 1, xcapture1, StepIndex);
-
-		OL_sagittal.StateEsimation(dxcom, 0.5, StepIndex);
-		
-		//-------------------with gaussian noise case---------------
+		// origin
+		//xcapture1 = LIPM.SagittallPos(zc, dxcom, 0.5, StepTime2);
+		//OL_sagittal.collect_walking_state(xcom - xcop1, dxcom, 0, xcapture1, StepIndex);
+		//OL_sagittal.StateEsimation(dxcom, 0.5, StepIndex);
+		//xcapture1 = OL_sagittal.footplacement_predict;
+		//xcop1 = xcop_peredicted_next_step_e_f;// xcom + xcapture1;
+		// add noise and filter	
+		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
+		//xcapture1 = LIPM.SagittallPos(zc, dxcom_e_f, 0.5, StepTime2);	
+		//xcop1 = xcom_e_f + xcapture1;
+		//cout << "xcom: "<<xcom-xcop1<<"\t xcom_e_f: "<<xcom_e_f - xcop1 <<"\t xcop2: " << xcop2 <<"\t xcop_peredicted_next_step_e_f: "<< xcop_peredicted_next_step_e_f <<endl<<endl;
+		//cout << "xcapture1: " << xcapture1 << "\t xcapture1_e_f_observe: " << xcapture1_e_f_observe << endl << endl;
+		//-------------------online estimation--------------------
 		/*
-		double vel_tar = OL_sagittal.vel_target(realtime, SimTime, StepTime1);
-		xcapture1 = LIPM.SagittallPos(zc, dxcom_e_f, vel_tar, StepTime2);
-		xcop1 = xcop_peredicted_next_step_e_f;//xcom_e_f + xcapture1;
+		//cout << "---xcop_peredicted_next_step_e_f: " << xcop_peredicted_next_step_e_f << endl;
+		//OL_sagittal.collect_walking_state(xcom_e_f - xcop1, dxcom_e_f, 1, xcapture2_e_f_predict, StepIndex);
+		cout << "---StepIndex ---" << StepIndex << endl << "xcom: " << xcom_e_f << "\t " << xcom - xcop1 << endl;
+		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
+		if (StepIndex >= (data_set_number + 2 + 1)) {
+			//xcop_peredicted_next_step_e_f = xcom_e_f +OL_sagittal.footplacement_predict;
+			//xcop_peredicted_next_step_e_f = xcom + OL_sagittal.footplacement_predict;
+			cout << "dataset_past_walking_state_stack" << OL_sagittal.dataset_past_walking_state_stack << "dataset_past_walking_state" << endl << OL_sagittal.dataset_past_walking_state << endl << OL_sagittal.dataset_next_footplacement << endl << "control coeff:" << OL_sagittal.control_coefficient << endl << "current walking state" << OL_sagittal.dataset_current_walking_state << endl << "footplacement estimation: " << OL_sagittal.footplacement_predict << endl << endl;
+			//xcop1 = xcop_peredicted_next_step_e_f; // xcop2;//
+			//cout << "fp_wrt_com: " << OL_sagittal.dataset_next_footplacement << endl;
+		}
 		*/
 
 		//-------------------Assign the global foot placement--------------
-		//xcop1 = xcom + OL_sagittal.footplacement_predict;
-
-		//-------------------check data-------------------
-		if (StepIndex >= (data_set_number + 2 + 2)) {
-			static const auto runOnce = [] { cout << "-------------Start online estimation----------------" << endl; return true; }();
-			OL_sagittal.collect_current_walking_state(dxcom, vel_tar);
-			OL_sagittal.calculate_model_coeff(OL_sagittal.dataset_past_walking_vel, OL_sagittal.dataset_next_footplacement);
-			OL_sagittal.estimate_walking_state_next_step(OL_sagittal.dataset_current_walking_state, OL_sagittal.model_coeff);
-			cout << "dataset_past_walking_state_stack: " << endl << OL_sagittal.dataset_past_walking_state_stack << endl << "dataset_past_walking_state: " << endl << OL_sagittal.dataset_past_walking_vel << endl;
-			cout << OL_sagittal.dataset_next_footplacement << endl << "control coeff:" << OL_sagittal.model_coeff << endl << "current walking state: " << OL_sagittal.dataset_current_walking_state << endl;
-			cout << "footplacement estimation: " << OL_sagittal.footplacement_predict << endl << endl;
-		}
-		xcop1 = xcom + OL_sagittal.footplacement_predict;
-		
-		//-------------------update the time-------------------
+		xcop1 = xcop2;
 		StepEndTime += StepTime2;
-		StepTime1 = StepTime2;
-	}	// here the condition is time based coz the time constraint comes from sagittal plane
+		StepTime1 = StepTime2; // assign the next step time to current step time
 
+		 //-------------------check data-------------------
+		//cout << "x accel: " << ddxcom*zc / (xcom - xcop1) << endl;
+		//cout << "Stepindex" << StepIndex << "  in dataset" << endl;
+		//cout << "----xcom: " << xcom << "\t dxcom: " << dxcom << endl;
+		//cout << "----xcom_e_f: " << xcom_e_f << "\t dxcom_e_f: " << dxcom_e_f << endl << endl;
+	}
+
+	//  below  apply FP control at lower rate
+	double time = StepEndTime - realtime;
+	double vel_tar = 0.5;// OL_sagittal.vel_target(realtime, SimTime, StepTime1);
+
+	xstate = LIPM.StateEvolution(zc, xcom - xcop1, dxcom, time);  // xstate is with respect to the support foot // why time is change but xstate does not changes a lot
+	xcapture1 = LIPM.SagittallPos(zc, xstate[1], vel_tar, StepTime2);// ideally, vel in and out are same in sagittal, 0.5 is target velocity
+	xcop2 = xcop1 + xstate[0] + xcapture1;  // xcop2 is the global position
+
+	//cout << xcop2 << endl;
+
+	/*
+	//xcop_peredicted_next_step_e_f = xcop1 + xstate[0] + xcapture1;
+
+	xstate_e_f = LIPM.StateEvolution(zc, xcom_e_f - xcop1, dxcom_e_f, time);  // ystate is with respect to the support foot																										 //ystate_noise_filter = LIPM.StateEvolution(zc, ycom_noise_filter-ycop1, dycom, time);
+	xcapture1_e_f_predict = LIPM.SagittallPos(zc, xstate_e_f[1], 0.5, StepTime2);
+	xcapture1_e_f_observe= xcop2- xcom_e_f;
+	//xcapture2_noise_filter_observe = xcop2-xcom_noise;
+	//xcapture2_noise_filter_observe = xstate[0]+xcapture2-xstate_noise_filter[0];
+	xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture1_e_f_observe;
+	//xcop_peredicted_next_step_e_f = xcop1 + xstate_e_f[0] + xcapture2_e_f_predict;
+	*/
 	return xcop1;
 }
 
@@ -260,6 +190,12 @@ void logdata() {
 	store_coeff_v0.push_back(OL_sagittal.model_coeff(0, 0));
 	store_coeff_vd.push_back(OL_sagittal.model_coeff(1, 0));
 	store_coeff_com_offset.push_back(OL_sagittal.model_coeff(2, 0));
+
+	// traj file
+	store_traj_LHip.push_back(1);
+	store_traj_LKnee.push_back(2);
+	store_traj_RHip.push_back(3);
+	store_traj_RKnee.push_back(4);
 }
 
 void savedata() {
@@ -286,6 +222,15 @@ void savedata() {
 		file << store_coeff_com_offset[i] << "\n";
 	};
 	file.close();
+
+	file.open("../../data/tarj.txt");
+	for (unsigned int i = 0; i<store_time.size(); i++) {
+		// Format for output data
+		file << store_traj_LHip[i] << "\t";
+		file << store_traj_LKnee[i] << "\t";
+		file << store_traj_RHip[i] << "\t";
+		file << store_traj_RKnee[i] << "\n";
+	};
 	std::cout << "Data saved:)" << endl;
 }
 
@@ -338,16 +283,3 @@ double Sign(double x)
 	else return -1.0;
 }
 
-
-
-// 加到未来程序里
-double LateralDifferentialDrive(double dym, double delta_dy, double ysway) {
-	double dym_mod; // modified desired dym, to have differential drive
-
-	if (abs(delta_dy) >= dym) { // delta_dy cannot be bigger than dym
-		delta_dy = Sign(delta_dy)*dym;
-	}
-
-	dym_mod = dym - Sign(ysway)*delta_dy; // to summarize, only one equation
-	return dym_mod;
-}

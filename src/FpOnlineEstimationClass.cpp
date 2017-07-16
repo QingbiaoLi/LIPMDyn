@@ -214,13 +214,13 @@ void FpOnlineEstimation::collect_next_footplacement(const double &next_fp_wrt_Co
 }
 void FpOnlineEstimation::set_weighting_matrix(const Ref<MatrixXd> &dataset_current) {
 	//--------------------------identity matrix---------------------------
-	/*
+	
 	for (int i = 0; i < number_of_dataset ; i++) {
 
 	weighting_matrix(i,i)=1;
 
 	}
-	*/
+	
 	double average = dataset_current.col(0).mean();
 
 	//--------------------------error variance---------------------------
@@ -236,7 +236,7 @@ void FpOnlineEstimation::set_weighting_matrix(const Ref<MatrixXd> &dataset_curre
 	}
 	*/
 //weight inversely proportional to error variance
-	
+	/*
 	for (int i = 0; i < number_of_dataset ; i++) {
 	weighting_matrix(i,i)=1/pow((dataset_current(i,0)-average),2);
 	}
@@ -246,6 +246,7 @@ void FpOnlineEstimation::set_weighting_matrix(const Ref<MatrixXd> &dataset_curre
 	for (int i = 0; i < number_of_dataset ; i++) {
 	weighting_matrix(i,i)=weighting_matrix(i,i)/sum;
 	}
+	*/
 	/*
 	//-------------------time dependent-------------------------
 
@@ -275,19 +276,27 @@ void FpOnlineEstimation::collect_current_walking_state(const double &local_com_v
 }
 
 double FpOnlineEstimation::estimate_walking_state_next_step(const Ref<MatrixXd> &current_walking_state, const Ref<MatrixXd> &model_coeff) {
-	cout<<"current_walking_state"<<endl<<current_walking_state<<endl<<endl;
+	cout<<"current_walking_state"<<endl<<current_walking_state<<endl;
 
 	walking_state_next_step = current_walking_state * model_coeff;
 	footplacement_predict = walking_state_next_step(0, 0);
-	cout <<"Online_estimation_fp: "<<footplacement_predict<<"; ";
+	cout << "Online_estimation_fp: " << footplacement_predict << "; " << endl << endl;
 	return footplacement_predict;
 }
 
-MatrixXd FpOnlineEstimation::calculate_model_coeff(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step) {
+MatrixXd FpOnlineEstimation::calculate_model_coeff_fp(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step) {
 	model_coeff = pinv(weighting_matrix*dataset_current)*weighting_matrix*dataset_next_step;
 
 	//cout<<"model_coeff"<<endl<<model_coeff<<endl;
+	return model_coeff;
+}
 
+
+//----------------------------------------------
+MatrixXd FpOnlineEstimation::calculate_model_coeff_dxf(const Ref<MatrixXd> &dataset_current, const Ref<MatrixXd> &dataset_next_step) {
+	model_coeff = pinv(weighting_matrix*dataset_current)*weighting_matrix*dataset_next_step;
+
+	//cout<<"model_coeff"<<endl<<model_coeff<<endl;
 	return model_coeff;
 }
 
@@ -313,14 +322,14 @@ void FpOnlineEstimation::StateEsimation(const double &local_com_vel, const doubl
 	static const auto runOnce = [] { cout << "-------------Start online estimation----------------"<< endl; return true;}();
 	//LIPM_StateEsimation(zc,com_pos_current,com_vel_current,look_ahead_time);
 	collect_current_walking_state(local_com_vel,targeted_vel);
-	calculate_model_coeff(dataset_past_walking_vel,dataset_next_footplacement);
+	calculate_model_coeff_fp(dataset_past_walking_vel,dataset_next_footplacement);
 	//estimate_walking_state_next_step(dataset_current_walking_state,model_coeff);
 	}
 	*/
 	else {
 		static const auto runOnce = [] { cout << "-------------Start online estimation----------------" << endl; return true; }();
 		collect_current_walking_state(local_com_vel, targeted_vel);
-		calculate_model_coeff(dataset_past_walking_vel, dataset_next_footplacement);
+		calculate_model_coeff_fp(dataset_past_walking_vel, dataset_next_footplacement);
 		/*
 		model_coeff(0, 0) = Tc*cosh(tao) / sinh(tao);
 		model_coeff(1, 0) = -Tc / sinh(tao);
@@ -350,7 +359,7 @@ double  FpOnlineEstimation::vel_target(double time, double totaltime, double Ste
 		dx = 0.3;
 	}
 	else if (time < t3) {
-		dx = dx = 0.2 / (2 * StepTime)*(time - totaltime*2 / 3) + 0.3;
+		dx =  0.2 / (2 * StepTime)*(time - totaltime*2 / 3) + 0.3;
 	}
 	else {
 		dx = 0.5;
