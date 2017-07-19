@@ -26,12 +26,13 @@ const double fullleg = upperleg + lowerleg;// full leg length
 const double hip_offset = 0.07260;// from pelvis center to hip joint
 
 
-double r_max = sqrt(upperleg*upperleg + lowerleg*lowerleg - 2 * upperleg*lowerleg*cos(pi - 5.0 / 180.0*pi));//maximum leg extension, also it is leg length of new swing leg in when heelstrike
-double r_min;
+double r_max ;//maximum leg extension, also it is leg length of new swing leg in when heelstrike
+
+double l_swing_min;
 double r_strike;// min stance leg length at heel-strike: r_strike->r_max
 double r_stance; // 
 double r_swing;// min swing leg length: r_max->r_min->r_strike
-short int r_state = 3;// 0->00, 1->10, 2->01, 3->11; left stance=1; right stance=1
+short int leg_state = 3;// 0->00, 1->10, 2->01, 3->11; left stance=1; right stance=1
 double rp = 0.30; // pendulum length from COM to the support center(FT sensor center), seems not used
 
 double theta_swing;//swing leg length in polar coordinate
@@ -42,12 +43,19 @@ double theta_stance;//stance leg length in polar coordinate
 double theta_stance0;//stance leg length in polar coordinate
 double theta_stancef;//stance leg length in polar coordinate
 
+double l_stance0;
+double l_stancef;
+
+double l_swing0;
+double l_swingf;
+
+
 double r_left;//left leg length in polar coordinate
 double theta_left;//left leg angle in polar coordinate
 double r_right;//right leg length in polar coordinate
 double theta_right;//right leg angle in polar coordinate
 
-				   /*mass, inertia*/
+/*mass, inertia*/
 const double M_tot = 17.0;
 double I_tot = M_tot*rp*rp;// approximated inertia in single mass model
 						   //const double  k_approx=0.98;
@@ -67,6 +75,9 @@ double Tstep;// period of one step
 double Tstep_des;// period of one step
 int numberofsteps = 0;
 
+bool initial_step;
+double angleL[3];
+double angleR[3];
 //r_min=fullleg-lift;// 5 cm less
 
 // LIPMsagittalGait origin header
@@ -82,6 +93,7 @@ double Sign(double x);
 LIPMDynClass LIPM;
 FpOnlineEstimation OL_sagittal;
 
+double time_cyclic;
 vector<double> xstate(2, 0);
 vector<double> xstate_e_f(2, 0);
 double StepTime1 = 0.5;
@@ -91,7 +103,9 @@ double SimTime = 10.0;
 double StopTime = SimTime - 0.0;
 
 double dT = 0.0002;
-double zc = 0.5;
+double zc = 0.8;
+double hip2ground = 0.685;
+double angle_bottom;
 //double g = 9.81;
 double realtime = 0.0;
 double xcom, dxcom, ddxcom;
@@ -155,5 +169,6 @@ vector<double> store_coeff_v0(1, 0);
 vector<double> store_coeff_vd(1, 0);
 vector<double> store_coeff_com_offset(1, 0);
 
-
+double vel_f_predict;
+double pos_f_predict;
 #endif

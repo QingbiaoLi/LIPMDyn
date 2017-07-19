@@ -52,7 +52,7 @@ plot(time,dxcom,'k','LineWidth',3);
 hold on; grid on;
 plot(time,dxcom_e_f,'r','LineWidth',3);
 title('Sagittal data in support foot frame','FontSize',25);
-target_vel= ones(size(dxcom,1),1)*0.5;
+target_vel= ones(size(dxcom,1),1)*0.3;
 plot(time,target_vel,'g','LineWidth',3);
 % Reference of Global COM pos
 % plot(time, com_ref_x,'g--');
