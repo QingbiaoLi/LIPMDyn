@@ -22,6 +22,8 @@ coeff_v0 = LateralGait(:,13);
 coeff_vd = LateralGait(:,14);
 coeff_com_offset= LateralGait(:,15);
 
+xcom_e =  LateralGait(:,16);
+dxcom_e =  LateralGait(:,17);
 %%
 %{
 result(1) = figure('name','online gain adpation for bipedal walking','units','normalized','outerposition',[0 0 1 1]);

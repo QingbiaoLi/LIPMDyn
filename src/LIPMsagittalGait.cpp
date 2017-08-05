@@ -9,7 +9,7 @@
 #include <chrono>
 #include <random>
 #include "LIPMDynClass.h"
-#include "FpOnlineEstimationClass.h"
+#include "OnlineEstimation.h"
 #include "FilterClass.h"
 #include "RobotParameter.h"
 
@@ -46,7 +46,10 @@ int main() {
 	StepEndTime = StartTime + StepTime1; // End time of 1st periodic step.
 	
 	//online estimation setting
-	OL_sagittal.Init(data_set_number);
+	//Init_OE(const int & fun_n_oe_start, const int & fun_c, const int & fun_n_fp, const int & fun_n_vel) 
+	OL_sagittal.Init_OE(6,4,6,3);
+	OL_sagittal.Init_LIPM(zc, StepTime1);
+
 	StepIndex = 0;
 	time_cyclic = 0;
 
@@ -84,25 +87,26 @@ void RTControl(double SamplingTime) {
 		std::normal_distribution<> distribution(0.0, (mag*noise_std));
 
 		gaussian_e = distribution(generator);
-
+	
 		xcom_e_old = xcom_e;
-		xcom_e = xcom + gaussian_e + com_offset;// it is a realistic measurement of CoM with gaussian noise and offset.
+		xcom_e = xcom + 0*gaussian_e + com_offset;// it is a realistic measurement of CoM with gaussian noise and offset.
 		dxcom_e = (xcom_e - xcom_e_old) / SamplingTime;
 
 		xcom_e_f = FilterClass_xcom.applyFilter(xcom_e);
 		dxcom_e_f = FilterClass_dxcom.applyFilter(dxcom_e);
-
 		
 		//cout << "xcom: " << xcom << "\t dxcom: " << dxcom << endl;
 		//cout << "xcom_e_f: " << xcom_e_f << "\t dxcom_e_f: " << dxcom_e_f << endl << endl;
+		
 		if (realtime <= StartTime) {
-			//Start1();	
+			Start1();	
 			if (initial_step) {
 				traj_angle_attack_init();
 				initial_step = false;
-				cout << "xcop1 within start time " << steplength / 2 <<endl<<endl;
+				//cout << "xcop1 within start time " << steplength / 2 <<endl<<endl;
 			}			
-			xcop1 = 0;
+			//double remaintime = StepEndTime - realtime;
+			//time_cyclic = StepTime2 - remaintime;
 			//xcop1 = steplength/2;
 			//cout << "xcop1 within start time " << xcop1<<endl<<endl;
 		}
@@ -122,8 +126,7 @@ void RTControl(double SamplingTime) {
 }
 
 double CyclicGaitLateral() {
-	double target_vel = 0.5;// OL_sagittal.vel_target(realtime, SimTime, StepTime1);
-
+	double target_vel = 0.5;//OL_sagittal.vel_target(realtime, SimTime, StepTime1); //
 	if (realtime>StartTime && store_time.back() < StartTime) {
 		// calculate xcapture1 after start period, only once	
 		xcapture1 = 0;
@@ -138,33 +141,7 @@ double CyclicGaitLateral() {
 	}
 	if (realtime > StepEndTime) {
 		StepIndex += 1;
-		// origin
-		//xcapture1 = LIPM.SagittallPos(zc, dxcom, 0.5, StepTime2);
-		//OL_sagittal.collect_walking_state(xcom - xcop1, dxcom, 0, xcapture1, StepIndex);
-		//OL_sagittal.StateEsimation(dxcom, 0.5, StepIndex);
-		//xcapture1 = OL_sagittal.footplacement_predict;
-		//xcop1 = xcop_peredicted_next_step_e_f;// xcom + xcapture1;
-		// add noise and filter	
-		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
-		//xcapture1 = LIPM.SagittallPos(zc, dxcom_e_f, 0.5, StepTime2);	
-		//xcop1 = xcom_e_f + xcapture1;
-		//cout << "xcom: "<<xcom-xcop1<<"\t xcom_e_f: "<<xcom_e_f - xcop1 <<"\t xcop2: " << xcop2 <<"\t xcop_peredicted_next_step_e_f: "<< xcop_peredicted_next_step_e_f <<endl<<endl;
-		//cout << "xcapture1: " << xcapture1 << "\t xcapture1_e_f_observe: " << xcapture1_e_f_observe << endl << endl;
-		//-------------------online estimation--------------------
-		/*
-		//cout << "---xcop_peredicted_next_step_e_f: " << xcop_peredicted_next_step_e_f << endl;
-		//OL_sagittal.collect_walking_state(xcom_e_f - xcop1, dxcom_e_f, 1, xcapture2_e_f_predict, StepIndex);
-		cout << "---StepIndex ---" << StepIndex << endl << "xcom: " << xcom_e_f << "\t " << xcom - xcop1 << endl;
-		//OL_sagittal.StateEsimation(dxcom_e_f, 0.5, StepIndex);
-		if (StepIndex >= (data_set_number + 2 + 1)) {
-			//xcop_peredicted_next_step_e_f = xcom_e_f +OL_sagittal.footplacement_predict;
-			//xcop_peredicted_next_step_e_f = xcom + OL_sagittal.footplacement_predict;
-			cout << "dataset_past_walking_state_stack" << OL_sagittal.dataset_past_walking_state_stack << "dataset_past_walking_state" << endl << OL_sagittal.dataset_past_walking_state << endl << OL_sagittal.dataset_next_footplacement << endl << "control coeff:" << OL_sagittal.control_coefficient << endl << "current walking state" << OL_sagittal.dataset_current_walking_state << endl << "footplacement estimation: " << OL_sagittal.footplacement_predict << endl << endl;
-			//xcop1 = xcop_peredicted_next_step_e_f; // xcop2;//
-			//cout << "fp_wrt_com: " << OL_sagittal.dataset_next_footplacement << endl;
-		}
-		*/
-
+	
 		//-------------------Assign the global foot placement--------------
 		//xcop1 = xcop2;
 			
@@ -173,11 +150,15 @@ double CyclicGaitLateral() {
 		// Place the estimation of swing foot location, then this become the support foot location
 			xcop1 = xcom + xcapture1;
 
-			theta_stance0 = atan((xcom - xcop1) / hip2ground);//theta_swingf;
-			l_stance0 = sqrt(pow((xcom - xcop1), 2) + pow(hip2ground, 2));
+			//theta_stance0 = atan((xcom - xcop1) / hip2ground);//theta_swingf;
+			//l_stance0 = sqrt(pow((xcom - xcop1), 2) + pow(hip2ground, 2));
 
-			footjudgement();
-		// Estimation of final velocity(LIPM)
+			// NEW ADD
+			OL_sagittal.OnlineEsitmation_main(xcom_e_f, dxcom_e_f, 1, xcapture1,0.5, StepIndex);
+			// NEW ADD
+			//OL_sagittal.OnlineEsitmation_vel(xcom - xcop1, dxcom, 1, StepIndex);
+
+			// Estimation of final velocity(LIPM)
 			// xstate is with respect to the support foot // why time is change but xstate does not changes a lot
 			xstate = LIPM.StateEvolution(zc,(xcom - xcop1), dxcom, StepTime2);
 			pos_f_predict = xstate[0];
@@ -186,14 +167,19 @@ double CyclicGaitLateral() {
 		// next placement of swing foot(LIPM)
 			//swingfoot placement respect to prediction CoM position at the end
 			// of current step
+
+			// NEW ADD
+			//OL_sagittal.OnlineEsitmation_fp(xcom - xcop1, dxcom, StepIndex, xcapture1,StepIndex);
+
 			xcapture1 = LIPM.SagittallPos(zc,vel_f_predict, target_vel, StepTime2);
 
-			theta_stancef = atan((pos_f_predict) / hip2ground);
-			l_stancef = sqrt(pow(pos_f_predict, 2) + pow(hip2ground, 2));
+			//theta_stancef = atan((pos_f_predict) / hip2ground);
+			//l_stancef = sqrt(pow(pos_f_predict, 2) + pow(hip2ground, 2));
 			theta_swingf  = atan((-xcapture1) / hip2ground);
-			l_swingf = sqrt(pow(-xcapture1, 2) + pow(hip2ground, 2));
+			l_swingf = sqrt(pow(hip2ground, 2)+pow(-xcapture1, 2) );
 
 		//-----------------------------Update the time---------------------
+		footjudgement();
 		StepEndTime += StepTime2;
 		StepTime1 = StepTime2; // assign the next step time to current step time
 
@@ -235,10 +221,19 @@ double CyclicGaitLateral() {
 }
 
 void traj_angle_attack_init() {
+
+
+	//theta_swing0 = 0;//atan((xcom - xcop1) / hip2ground);
+	//l_swing0 = sqrt(pow((0), 2) + pow(hip2ground, 2));
+
+	//theta_swingf = atan((-0.4) / hip2ground);
+	//l_swingf = sqrt(pow(hip2ground, 2) + pow(-0.4, 2));
+
+	
 	/*define gait parameters*/
 	phi = deg2rad(25);//inter leg angle
 	theta_slope = deg2rad(6);
-	lift = 0.02;
+	lift = 0.15;//0.05;
 	Tstep = StepTime2;
 
 	//r_max = sqrt(upperleg*upperleg + lowerleg*lowerleg - 2 * upperleg*lowerleg*cos(pi - 5.0 / 180.0*pi));
@@ -272,38 +267,34 @@ void traj_angle_attack_init() {
 		Sleep(2000);//system("PAUSE");
 		exit(0);
 	}
-	/*
-	if (l_swing_min >= r_strike)
-	{
-		cout << "l_swing_min is bigger than r_strike, swing leg hits the ground" << endl;
-		system("PAUSE");
-		exit(0);
-	}
-	*/
 
-	//display
+	////display
 
-	cout << "r_max" << r_max << endl;
-	cout << "l_swing_min" << l_swing_min << endl;
-	cout << "theta_stance0 \t" << theta_stance0*180.0 / pi << "\t degree" << endl;
-	cout << "theta_stancef \t" << theta_stancef*180.0 / pi << "\t degree" << endl;
-	cout << "Tc \t" << Tc << " s" << endl;
-	cout << "Tstep \t" << Tstep << " s" << endl;
-	cout << "r_max-l_swing_min \t" << r_max - l_swing_min << " m" << endl;
-
+	//cout << "r_max" << r_max << endl;
+	//cout << "l_swing_min" << l_swing_min << endl;
+	//cout << "theta_stance0 \t" << theta_stance0*180.0 / pi << "\t degree" << endl;
+	//cout << "theta_stancef \t" << theta_stancef*180.0 / pi << "\t degree" << endl;
+	//cout << "Tc \t" << Tc << " s" << endl;
+	//cout << "Tstep \t" << Tstep << " s" << endl;
+	//cout << "r_max-l_swing_min \t" << r_max - l_swing_min << " m" << endl;
+	
 }
 
 void traj_angle_hipknee_generate() {
 	//----------------------------stance foot trajectory----------------------------
 	double T_stance0 = 0.5*Tstep;//here to tune the time for leg extension
-	double T_stancef = 0.95*Tstep;
+	double T_stancef = Tstep;//0.95*
 
+	
 	//if (time_cyclic <= T_stancef)
-	if (0<time_cyclic <= Tstep)
+	if (time_cyclic <= Tstep)
 	{
 		theta_stance = atan((xcom - xcop1) / hip2ground);//Poly_stance(0, theta_stance0, T_stancef, theta_stancef, time_cyclic);
 		r_stance = sqrt(pow(hip2ground, 2) + pow((xcom - xcop1), 2));//Poly(T_stance0, r_strike, T_stancef, r_max, time_cyclic);
 	}
+	//cout << "time_cyclic: " << time_cyclic << endl;
+	//cout << "xcom local: " << (xcom - xcop1) <<"\t theta_stance: "<< theta_stance << atan(0.5)<<endl<<endl;
+
 	/*
 	else
 	{
@@ -330,7 +321,7 @@ void traj_angle_hipknee_generate() {
 	//----------------------------swing foot trajectory, polynomial method----------------------------
 	// polar coordinate method
 	double T_swing0 = 0.5*Tstep;//here to tune the time for leg extension
-	double T_swingf = 0.95*Tstep;
+	double T_swingf = Tstep;
 	
 
 	if (time_cyclic<T_swingf)// swing angle control
@@ -453,7 +444,7 @@ void IK2D(double theta, double l0, double *angle)
 	//C = l0;
 
 	kneeMin = deg2rad(0);//deg2rad(1)=0.017453292519943
-	kneeMax = deg2rad(120);//0.6;// 
+	kneeMax = deg2rad(180);//0.6;// 
 	kneeExtentionMax = sqrt(lh*lh + ls*ls - 2 * lh*ls*cos(pi - kneeMin));
 	kneeExtentionMin = sqrt(lh*lh + ls*ls - 2 * lh*ls*cos(pi - kneeMax));
 
@@ -519,11 +510,17 @@ void logdata() {
 	store_xcapture1_e_f_predict.push_back(xcapture1_e_f_predict);
 	store_xcapture1_e_f_observe.push_back(xcapture1_e_f_observe);
 	//10
-	store_fp_wrt_com.push_back(OL_sagittal.footplacement_predict);
+	/*store_fp_wrt_com.push_back(OL_sagittal.return_fp_wrt_com);
 	store_com_wrt_stance_foot.push_back(xcom - xcop1);
-	store_coeff_v0.push_back(OL_sagittal.model_coeff(0, 0));
-	store_coeff_vd.push_back(OL_sagittal.model_coeff(1, 0));
-	store_coeff_com_offset.push_back(OL_sagittal.model_coeff(2, 0));
+	store_coeff_v0.push_back(OL_sagittal.return_coeff_vel(0, 0));
+	store_coeff_vd.push_back(OL_sagittal.return_coeff_vel(1, 0));
+	store_coeff_com_offset.push_back(OL_sagittal.return_coeff_vel(2, 0));
+*/
+	store_fp_wrt_com.push_back(0);
+	store_com_wrt_stance_foot.push_back(0);
+	store_coeff_v0.push_back(0);
+	store_coeff_vd.push_back(0);
+	store_coeff_com_offset.push_back(0);
 
 	// traj file
 	store_traj_LHip.push_back(angleL[0]);
@@ -531,6 +528,19 @@ void logdata() {
 	store_traj_RHip.push_back(angleR[0]);
 	store_traj_RKnee.push_back(angleR[1]);
 	
+	store_theta_stance.push_back(theta_stance);
+	store_l_stance.push_back(r_stance);
+	store_theta_swing.push_back(theta_swing);
+	store_l_swing.push_back(r_swing);
+
+	store_theta_left.push_back(theta_left);
+	store_r_left.push_back(r_left);
+	store_theta_right.push_back(theta_right);
+	store_r_right.push_back(r_right);
+
+	//temporary store 
+	store_xcom_e.push_back(xcom_e);
+	store_dxcom_e.push_back(dxcom_e);
 }
 
 void savedata() {
@@ -554,7 +564,9 @@ void savedata() {
 		file << store_com_wrt_stance_foot[i] << "\t";
 		file << store_coeff_v0[i] << "\t";
 		file << store_coeff_vd[i] << "\t";
-		file << store_coeff_com_offset[i] << "\n";
+		file << store_coeff_com_offset[i] << "\t";
+		file << store_xcom_e[i] << "\t";
+		file << store_dxcom_e[i] << "\n";
 	};
 	file.close();
 
@@ -565,7 +577,17 @@ void savedata() {
 		file << store_traj_LKnee[i] << "\t";
 		file << store_traj_RHip[i] << "\t";
 		file << store_traj_RKnee[i] << "\t";
-		file << store_time[i] << "\n";
+		// temporary logout for check data
+		file << store_theta_stance[i] << "\t";
+		file << store_l_stance[i]	<< "\t";
+		file << store_theta_swing[i] << "\t";
+		file << store_l_swing[i]	<< "\t";
+
+		file << store_theta_left[i] << "\t";
+		file << store_r_left[i]		<< "\t";
+		file << store_theta_right[i] << "\t";
+		file << store_r_right[i]	<< "\n";
+		//file << store_time[i] << "\n";
 	};
 	std::cout << "Data saved:)" << endl;
 }
@@ -573,6 +595,7 @@ void savedata() {
 
 double Start1()
 {
+	
 	if (realtime>tswitch && store_time.back() < tswitch)
 	{
 		double t2;
@@ -582,17 +605,14 @@ double Start1()
 		StartTime = tswitch + t2;
 		StepEndTime = StartTime + StepTime2; // end time of 1st periodic step
 	}
-
-	if (realtime < tswitch) // now update very 20 ms.
+	/*
+	if (time_cyclic <= Tstep)
 	{
-		xcop1 = p_minus; //otherwise remain the CoP at current position.
+		xcom = Poly(0, -0.2, 0, Tstep, time_cyclic);
 	}
-	else
-	{
-		xcop1 = p_plus;
-	}
-
-
+	*/
+	//xcop1 = 0;
+	//footjudgement();
 	//ddxcom = (xcom-xcop1)/zc*g;
 	return xcop1;
 }

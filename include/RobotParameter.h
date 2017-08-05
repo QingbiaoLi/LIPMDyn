@@ -2,6 +2,8 @@
 #define _robotPara_H
 #include <cmath>
 
+
+//#include <math.h>       /* atan */
 const double pi = 3.14159265358979323846264;
 /*pls be awared that this self defined funtion deg2rad() doesnt support
 any arithmetic calculation(+_x/), no matter inside or outside bracket*/
@@ -20,8 +22,8 @@ robotlimb legR, legL, armR, armL;
 */
 
 /* robot dimension , mass, inertia */
-const double upperleg = 0.342;
-const double lowerleg = 0.355;
+const double upperleg =  0.342;//0.5;//
+const double lowerleg =  0.355; //0.55;//
 const double fullleg = upperleg + lowerleg;// full leg length
 const double hip_offset = 0.07260;// from pelvis center to hip joint
 
@@ -91,20 +93,20 @@ double Stop(double zc, double kp, double kd, double xs, double dxs, double p_plu
 double Sign(double x);
 
 LIPMDynClass LIPM;
-FpOnlineEstimation OL_sagittal;
+OnlineEstimation OL_sagittal;
 
 double time_cyclic;
 vector<double> xstate(2, 0);
 vector<double> xstate_e_f(2, 0);
-double StepTime1 = 0.5;
-double StepTime2 = 0.5;
+double StepTime1 = 0.45;
+double StepTime2 = 0.45;
 double StartTime;
 double SimTime = 10.0;
 double StopTime = SimTime - 0.0;
 
 double dT = 0.0002;
-double zc = 0.8;
-double hip2ground = 0.685;
+double zc = 0.8; //1.0;//
+double hip2ground = 0.65; //1.0;
 double angle_bottom;
 //double g = 9.81;
 double realtime = 0.0;
@@ -134,6 +136,19 @@ vector<double> store_traj_LKnee(1, 0);
 vector<double> store_traj_RHip(1, 0);
 vector<double> store_traj_RKnee(1, 0);
 
+
+vector<double> store_theta_stance(1, 0);
+vector<double> store_l_stance(1, 0);
+vector<double> store_theta_swing(1, 0);
+vector<double> store_l_swing(1, 0);
+
+vector<double> store_theta_left(1, 0);
+vector<double> store_r_left(1, 0);
+vector<double> store_theta_right(1, 0);
+vector<double> store_r_right(1, 0);
+
+vector<double> store_xcom_e(1, 0);
+vector<double> store_dxcom_e(1, 0);
 double dis_time = 0;
 double dis_duration = 0.1;
 double dis_A;
@@ -144,7 +159,7 @@ bool dis_enable = 0;
 int StepIndex;
 double samplingTime = 0.004;
 int data_set_number = 6;
-double com_offset = 0.0;
+double com_offset = 0.00;
 double fp_wrt_com;
 
 //add noise
